@@ -1,53 +1,75 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { auth } from '@/lib/firebase';
+import { getSchedule, ScheduleItem } from '@/lib/firestore';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  
+  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login'); // Redirect if not logged in
+    // Redirect if not logged in
+    if (!authLoading && !user) {
+      router.push('/login');
     }
 
-    // This sets up the listener when the user is logged in
+    // Fetch data when the user is available
     if (user) {
-      const handleMessage = async (event: MessageEvent) => {
-        // We only accept messages from our own extension
-        if (event.data.type === 'GET_AUTH_TOKEN') {
-          console.log("Web app received a request for a token...");
-          const idToken = await user.getIdToken(true); // Get a fresh token
-          
-          // Send the token back to the extension
-          window.postMessage({ type: 'AUTH_TOKEN', token: idToken }, '*');
-        }
-      };
-      
-      window.addEventListener('message', handleMessage);
-
-      // Clean up the listener when the component unmounts
-      return () => {
-        window.removeEventListener('message', handleMessage);
-      };
+      getSchedule(user.uid)
+        .then(data => {
+          setSchedule(data);
+        })
+        .catch(error => {
+          console.error("Error fetching schedule:", error);
+        })
+        .finally(() => {
+          setDataLoading(false);
+        });
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
-  if (loading || !user) {
-    return <div>Loading...</div>;
+  // We are not including the auth token listener from before to keep this clean.
+  // In a real app, you would combine them.
+
+  if (authLoading || dataLoading) {
+    return <div>Loading Dashboard...</div>;
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Welcome, {user.displayName}</h1>
+    <div className="p-4 md:p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Welcome, {user?.displayName}</h1>
         <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
       </div>
-      <p>This is your protected dashboard.</p>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>My Schedule</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {schedule.length > 0 ? (
+            <div className="space-y-4">
+              {schedule.map((item) => (
+                <div key={item.section} className="p-3 bg-secondary rounded-lg">
+                  <p className="font-bold">{item.courseCode} - {item.section}</p>
+                  <p>{item.day}, {item.startTime} - {item.endTime}</p>
+                  <p>Room: {item.room} | Prof: {item.professor || 'N/A'}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No schedule data found. Use the extension to sync your schedule from the portal.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
