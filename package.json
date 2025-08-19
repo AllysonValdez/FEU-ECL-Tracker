@@ -1,0 +1,17 @@
+{
+  "name": "feu-ecl-tracker",
+  "private": true,
+  "dependencies": {
+    "@emotion/is-prop-valid": "latest",
+    "@radix-ui/react-accordion": "latest",
+    // ... all other dependencies
+    "vaul": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "postcss": "^8.5",
+    "typescript": "^5"
+  }
+}
